@@ -1,446 +1,510 @@
-/* 
-* GL Assessment Style Year 4 Mental Maths Quiz
-* 
-* Colour contrast: All text meets WCAG AA contrast requirements
-* - Main text (#2d3748 on #f7fafc): 11.95:1 ratio
-* - Primary buttons (#3182ce on white): 3.93:1 ratio (meets AA for large text)
-* - Timer colours follow a traffic light system with appropriate contrast
-*/
+// GL Assessment Style Year 4 Mental Maths Quiz
 
-/* Base styles and CSS reset */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+// Questions array - edit these to customise the quiz
+// Format: { q: "Question text?", a: numerical_answer }
+const questions = [
+    { q: "What is seven plus nine?", a: 16 },
+    { q: "What is half of twenty-four?", a: 12 },
+    { q: "What is thirty minus seventeen?", a: 13 },
+    { q: "How many fives are there in forty-five?", a: 9 },
+    { q: "What is three quarters of twenty?", a: 15 }
+];
+
+// Game state
+let currentQuestion = 0;
+let correctAnswers = 0;
+let incorrectAnswers = 0;
+let isListening = false;
+let isAnswering = false;
+let timer = null;
+let timeLeft = 10;
+let synth = window.speechSynthesis;
+let selectedVoice = null;
+let voiceInitialized = false;
+
+// DOM elements
+const startScreen = document.getElementById('start-screen');
+const startButton = document.getElementById('start-button');
+const testAudioButton = document.getElementById('test-audio');
+const listeningState = document.getElementById('listening-state');
+const answeringState = document.getElementById('answering-state');
+const feedbackState = document.getElementById('feedback-state');
+const resultsContainer = document.getElementById('results-container');
+const answerInput = document.getElementById('answer-input');
+const progressBar = document.getElementById('progress-bar');
+const progressText = document.getElementById('progress-text');
+const feedbackText = document.getElementById('feedback-text');
+const feedbackIcon = document.getElementById('feedback-icon');
+const timerText = document.getElementById('timer-text');
+const timerProgress = document.querySelector('.timer-progress');
+const finalScore = document.getElementById('final-score');
+const percentageScore = document.getElementById('percentage');
+const correctCount = document.getElementById('correct-count');
+const incorrectCount = document.getElementById('incorrect-count');
+const playAgainButton = document.getElementById('play-again');
+
+// Set up event listeners
+document.addEventListener('DOMContentLoaded', setupQuiz);
+startButton.addEventListener('click', startQuiz);
+testAudioButton.addEventListener('click', testAudio);
+answerInput.addEventListener('keydown', handleAnswerSubmit);
+playAgainButton.addEventListener('click', resetQuiz);
+
+// Initial setup
+function setupQuiz() {
+    console.log('Setting up quiz...');
+    // Try to initialize voices
+    initVoice();
+    
+    // Fallback: If voices don't initialize within 3 seconds, enable the start button anyway
+    setTimeout(() => {
+        if (!voiceInitialized) {
+            console.log('Voice initialization timeout - enabling start button anyway');
+            voiceInitialized = true; // Prevent further timeouts
+        }
+    }, 3000);
 }
 
-:root {
-    --primary-color: #3182ce;
-    --primary-dark: #2c5282;
-    --secondary-color: #38a169;
-    --background-color: #f7fafc;
-    --text-color: #2d3748;
-    --timer-normal: #38a169;
-    --timer-warning: #ed8936;
-    --timer-danger: #e53e3e;
-    --success-color: #48bb78;
-    --error-color: #f56565;
-    --light-grey: #e2e8f0;
-    --white: #ffffff;
-    --border-radius: 8px;
-    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    --transition-speed: 0.3s;
-}
+// Initialize speech synthesis and find the best voice
+function initVoice() {
+    console.log('Initializing voice...');
 
-body {
-    font-family: 'Nunito', sans-serif;
-    background-color: var(--background-color);
-    color: var(--text-color);
-    line-height: 1.6;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-}
-
-/* Container styles */
-#quiz-container {
-    width: 100%;
-    max-width: 600px;
-    background-color: var(--white);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-    position: relative;
-}
-
-header {
-    background-color: var(--primary-color);
-    color: var(--white);
-    padding: 20px;
-    text-align: center;
-}
-
-h1 {
-    font-size: 1.8rem;
-    font-weight: 700;
-    margin-bottom: 10px;
-}
-
-h2 {
-    font-size: 1.5rem;
-    margin-bottom: 15px;
-    color: var(--primary-dark);
-}
-
-/* Progress bar */
-#progress-container {
-    position: relative;
-    height: 25px;
-    background-color: var(--light-grey);
-    border-radius: 12px;
-    overflow: hidden;
-    margin-top: 10px;
-}
-
-#progress-bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    background-color: var(--secondary-color);
-    width: 0;
-    transition: width 0.5s ease;
-}
-
-#progress-text {
-    position: relative;
-    z-index: 1;
-    color: var(--white);
-    font-weight: 600;
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
-}
-
-/* Game area styles */
-#game-area {
-    padding: 30px 20px;
-    min-height: 250px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-.state {
-    display: none;
-    width: 100%;
-    text-align: center;
-}
-
-.state.active {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.5s ease;
-}
-
-/* Audio animation */
-.audio-animation {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 20px 0;
-    height: 50px;
-}
-
-.audio-animation span {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    margin: 0 5px;
-    background-color: var(--primary-color);
-    border-radius: 50%;
-}
-
-.audio-animation span:nth-child(1) {
-    animation: pulse 1s infinite;
-}
-
-.audio-animation span:nth-child(2) {
-    animation: pulse 1s infinite 0.2s;
-}
-
-.audio-animation span:nth-child(3) {
-    animation: pulse 1s infinite 0.4s;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        transform: scale(1);
-        opacity: 0.5;
-    }
-    50% {
-        transform: scale(1.5);
-        opacity: 1;
+    // First attempt to get voices synchronously
+    let voices = synth.getVoices();
+    
+    if (voices.length > 0) {
+        selectVoice(voices);
+        voiceInitialized = true;
+    } else {
+        // If voices aren't available yet, set up the event listener
+        console.log('No voices available yet, waiting for voiceschanged event');
+        synth.addEventListener('voiceschanged', () => {
+            if (!voiceInitialized) {
+                voices = synth.getVoices();
+                selectVoice(voices);
+                voiceInitialized = true;
+            }
+        });
+        
+        // Set a backup timeout in case the event never fires
+        setTimeout(() => {
+            if (!voiceInitialized) {
+                console.log('Timeout waiting for voices, using default');
+                voiceInitialized = true;
+                // Try once more to get voices
+                voices = synth.getVoices();
+                if (voices.length > 0) {
+                    selectVoice(voices);
+                }
+            }
+        }, 2000);
     }
 }
 
-/* Answer input */
-label {
-    font-size: 1.2rem;
-    margin-bottom: 15px;
-    font-weight: 600;
-}
-
-#answer-input {
-    font-family: 'Nunito', sans-serif;
-    font-size: 2rem;
-    width: 120px;
-    height: 70px;
-    border: 2px solid var(--primary-color);
-    border-radius: var(--border-radius);
-    text-align: center;
-    margin-bottom: 20px;
-    outline: none;
-    transition: border-color var(--transition-speed);
-}
-
-#answer-input:focus {
-    border-color: var(--primary-dark);
-    box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.3);
-}
-
-/* Timer styles */
-.timer-container {
-    margin-top: 20px;
-}
-
-.timer-circle {
-    position: relative;
-    width: 80px;
-    height: 80px;
-    margin: 0 auto;
-}
-
-svg {
-    transform: rotate(-90deg);
-    width: 100%;
-    height: 100%;
-}
-
-.timer-background {
-    fill: none;
-    stroke: var(--light-grey);
-    stroke-width: 8;
-}
-
-.timer-progress {
-    fill: none;
-    stroke: var(--timer-normal);
-    stroke-width: 8;
-    stroke-linecap: round;
-    stroke-dasharray: 283;
-    stroke-dashoffset: 0;
-    transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
-}
-
-#timer-text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: var(--text-color);
-}
-
-/* Feedback styles */
-#feedback-text {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 15px;
-}
-
-#feedback-icon {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-    margin: 0 auto;
-}
-
-.correct-icon {
-    background-color: var(--success-color);
-    color: var(--white);
-}
-
-.correct-icon::after {
-    content: "✓";
-}
-
-.incorrect-icon {
-    background-color: var(--error-color);
-    color: var(--white);
-}
-
-.incorrect-icon::after {
-    content: "✗";
-}
-
-/* Results container */
-#results-container {
-    padding: 30px 20px;
-    text-align: center;
-}
-
-.results-summary {
-    margin-bottom: 25px;
-    font-size: 1.2rem;
-}
-
-#final-score, #percentage {
-    font-weight: 700;
-    font-size: 1.4rem;
-    color: var(--primary-color);
-}
-
-.results-details {
-    display: flex;
-    justify-content: center;
-    gap: 40px;
-    margin-bottom: 30px;
-}
-
-.result-stat {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.result-label {
-    font-size: 1rem;
-    text-transform: uppercase;
-    color: var(--text-color);
-    opacity: 0.8;
-}
-
-.result-value {
-    font-size: 2.5rem;
-    font-weight: 700;
-}
-
-#correct-count {
-    color: var(--success-color);
-}
-
-#incorrect-count {
-    color: var(--error-color);
-}
-
-/* Start screen */
-#start-screen {
-    display: none;
-    padding: 30px 20px;
-    text-align: center;
-}
-
-#start-screen.active {
-    display: block;
-}
-
-#start-screen p {
-    margin-bottom: 15px;
-}
-
-.audio-settings {
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid var(--light-grey);
-}
-
-/* Button styles */
-.primary-button, .secondary-button {
-    font-family: 'Nunito', sans-serif;
-    font-size: 1.1rem;
-    font-weight: 600;
-    padding: 12px 24px;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: background-color var(--transition-speed), transform var(--transition-speed);
-    border: none;
-    outline: none;
-}
-
-.primary-button {
-    background-color: var(--primary-color);
-    color: var(--white);
-}
-
-.primary-button:hover, .primary-button:focus {
-    background-color: var(--primary-dark);
-}
-
-.secondary-button {
-    background-color: var(--white);
-    color: var(--primary-color);
-    border: 1px solid var(--primary-color);
-}
-
-.secondary-button:hover, .secondary-button:focus {
-    background-color: rgba(49, 130, 206, 0.1);
-}
-
-.primary-button:active, .secondary-button:active {
-    transform: translateY(2px);
-}
-
-/* Footer */
-footer {
-    margin-top: 30px;
-    text-align: center;
-    color: var(--text-color);
-    opacity: 0.7;
-    font-size: 0.9rem;
-}
-
-/* Utility classes */
-.hidden {
-    display: none;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
-}
-
-/* Media queries for responsiveness */
-@media (max-width: 480px) {
-    #quiz-container {
-        max-width: 100%;
+// Select the best voice (UK female preferred)
+function selectVoice(voices = synth.getVoices()) {
+    console.log(`Selecting voice from ${voices.length} available voices`);
+    
+    if (voices.length === 0) {
+        console.log('No voices available for selection');
+        return;
     }
     
-    h1 {
-        font-size: 1.5rem;
+    // Log all available voices for debugging
+    voices.forEach((voice, index) => {
+        console.log(`Voice ${index}: ${voice.name}, ${voice.lang}`);
+    });
+    
+    // First try: UK female voice
+    selectedVoice = voices.find(voice => 
+        voice.lang.startsWith('en-GB') && 
+        /Female|woman|girl/i.test(voice.name)
+    );
+    
+    // Second try: Any UK voice
+    if (!selectedVoice) {
+        selectedVoice = voices.find(voice => 
+            voice.lang.startsWith('en-GB')
+        );
     }
     
-    h2 {
-        font-size: 1.3rem;
+    // Third try: Any English voice
+    if (!selectedVoice) {
+        selectedVoice = voices.find(voice => 
+            voice.lang.startsWith('en')
+        );
     }
     
-    #answer-input {
-        font-size: 1.8rem;
-        width: 100px;
-        height: 60px;
+    // Fallback: Use the first available voice
+    if (!selectedVoice && voices.length > 0) {
+        selectedVoice = voices[0];
     }
     
-    .results-details {
-        gap: 20px;
+    console.log('Selected voice:', selectedVoice ? selectedVoice.name : 'No voice selected');
+}
+
+// Test audio function
+function testAudio() {
+    console.log('Testing audio...');
+    // Make sure we have the latest voices
+    selectVoice();
+    speak("This is a test. Your audio is working correctly.", false);
+}
+
+// Start the quiz
+function startQuiz() {
+    console.log('Starting quiz...');
+    // Force voice selection again just to be sure
+    selectVoice();
+    
+    startScreen.classList.remove('active');
+    currentQuestion = 0;
+    correctAnswers = 0;
+    incorrectAnswers = 0;
+    updateProgressBar();
+    startNextQuestion();
+}
+
+// Reset the quiz to play again
+function resetQuiz() {
+    console.log('Resetting quiz...');
+    resultsContainer.classList.add('hidden');
+    startQuiz();
+}
+
+// Start the next question
+function startNextQuestion() {
+    console.log(`Starting question ${currentQuestion + 1}`);
+    
+    if (currentQuestion >= questions.length) {
+        showResults();
+        return;
     }
     
-    .result-value {
-        font-size: 2rem;
+    // Show listening state
+    showState(listeningState);
+    updateProgressBar();
+    
+    // Read the question twice
+    isListening = true;
+    const questionText = questions[currentQuestion].q;
+    speak(questionText, true);
+}
+
+// Speak text function - reads text aloud and triggers callback when done
+function speak(text, isQuestion = false) {
+    console.log('Speaking:', text);
+    
+    // Cancel any ongoing speech
+    try {
+        synth.cancel();
+    } catch (e) {
+        console.error('Error cancelling speech:', e);
+    }
+    
+    // Create utterance
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Set voice and parameters
+    if (selectedVoice) {
+        utterance.voice = selectedVoice;
+    }
+    utterance.rate = 0.9;  // Slightly slower for clarity
+    utterance.pitch = 1.0;
+    
+    // Handle errors in speech synthesis
+    utterance.onerror = (event) => {
+        console.error('Speech synthesis error:', event);
+        
+        // If we encounter an error during the first reading and we're in question mode,
+        // move to the answering state to prevent the quiz from hanging
+        if (isQuestion && isListening) {
+            console.log('Speech error during question, moving to answer state');
+            isListening = false;
+            showAnsweringState();
+        }
+    };
+    
+    // Set callback for when speech ends
+    if (isQuestion) {
+        utterance.onend = () => {
+            console.log('First reading complete');
+            
+            // Read the question a second time
+            setTimeout(() => {
+                const repeatUtterance = new SpeechSynthesisUtterance(text);
+                if (selectedVoice) {
+                    repeatUtterance.voice = selectedVoice;
+                }
+                repeatUtterance.rate = 0.9;
+                repeatUtterance.pitch = 1.0;
+                
+                repeatUtterance.onend = () => {
+                    console.log('Second reading complete, moving to answer state');
+                    isListening = false;
+                    showAnsweringState();
+                };
+                
+                // Handle errors in the second reading
+                repeatUtterance.onerror = (event) => {
+                    console.error('Speech synthesis error during second reading:', event);
+                    isListening = false;
+                    showAnsweringState();
+                };
+                
+                try {
+                    synth.speak(repeatUtterance);
+                } catch (e) {
+                    console.error('Error during second speaking attempt:', e);
+                    isListening = false;
+                    showAnsweringState();
+                }
+                
+                // Safety timeout in case speech synthesis fails silently
+                setTimeout(() => {
+                    if (isListening) {
+                        console.log('Safety timeout triggered, moving to answer state');
+                        isListening = false;
+                        showAnsweringState();
+                    }
+                }, 5000);
+                
+            }, 1000);
+        };
+    }
+    
+    // Speak the text with error handling
+    try {
+        synth.speak(utterance);
+        
+        // Safety timeout in case the onend event never fires
+        if (isQuestion) {
+            setTimeout(() => {
+                if (isListening) {
+                    console.log('First reading timeout triggered, starting second reading');
+                    // Force second reading if onend didn't fire
+                    const repeatUtterance = new SpeechSynthesisUtterance(text);
+                    if (selectedVoice) {
+                        repeatUtterance.voice = selectedVoice;
+                    }
+                    
+                    repeatUtterance.onend = () => {
+                        isListening = false;
+                        showAnsweringState();
+                    };
+                    
+                    try {
+                        synth.speak(repeatUtterance);
+                    } catch (e) {
+                        console.error('Error during forced second reading:', e);
+                        isListening = false;
+                        showAnsweringState();
+                    }
+                    
+                    // Final safety timeout
+                    setTimeout(() => {
+                        if (isListening) {
+                            console.log('Final safety timeout triggered');
+                            isListening = false;
+                            showAnsweringState();
+                        }
+                    }, 5000);
+                }
+            }, 6000);
+        }
+    } catch (e) {
+        console.error('Error speaking:', e);
+        
+        // If speech fails and we're in question mode, move to answer state
+        if (isQuestion) {
+            console.log('Speech failed, moving to answer state');
+            isListening = false;
+            showAnsweringState();
+        }
     }
 }
 
-/* Accessibility: Respect prefers-reduced-motion */
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.001ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.001ms !important;
-    }
+// Show the answering state and start the timer
+function showAnsweringState() {
+    console.log('Showing answer state');
+    showState(answeringState);
+    answerInput.value = '';
+    answerInput.focus();
+    isAnswering = true;
+    timeLeft = 10;
+    updateTimer();
     
-    .timer-progress {
-        transition: stroke 0.001ms;
+    // Start the countdown
+    timer = setInterval(() => {
+        timeLeft--;
+        updateTimer();
+        
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            handleTimeUp();
+        }
+    }, 1000);
+}
+
+// Update the timer display and animation
+function updateTimer() {
+    timerText.textContent = timeLeft;
+    
+    // Calculate the dashoffset for the circle animation
+    // The circle has a circumference of 283 (2 * PI * 45)
+    const circumference = 283;
+    const offset = circumference - (timeLeft / 10) * circumference;
+    timerProgress.style.strokeDashoffset = offset;
+    
+    // Change colour based on time remaining
+    if (timeLeft <= 3) {
+        timerProgress.style.stroke = 'var(--timer-danger)';
+    } else if (timeLeft <= 6) {
+        timerProgress.style.stroke = 'var(--timer-warning)';
+    } else {
+        timerProgress.style.stroke = 'var(--timer-normal)';
     }
 }
+
+// Handle when time is up
+function handleTimeUp() {
+    console.log('Time is up');
+    isAnswering = false;
+    incorrectAnswers++;
+    
+    // Show incorrect feedback
+    showFeedback(false, "Time's up!");
+}
+
+// Handle answer submission
+function handleAnswerSubmit(event) {
+    if (event.key === 'Enter' && isAnswering) {
+        event.preventDefault();
+        console.log('Answer submitted');
+        
+        // Stop the timer
+        clearInterval(timer);
+        isAnswering = false;
+        
+        // Get the user's answer
+        const userAnswer = parseInt(answerInput.value);
+        const correctAnswer = questions[currentQuestion].a;
+        
+        // Check if the answer is correct
+        const isCorrect = userAnswer === correctAnswer;
+        console.log(`Answer: ${userAnswer}, Correct: ${correctAnswer}, isCorrect: ${isCorrect}`);
+        
+        // Update scores
+        if (isCorrect) {
+            correctAnswers++;
+        } else {
+            incorrectAnswers++;
+        }
+        
+        // Show feedback
+        showFeedback(isCorrect, isCorrect ? "Correct!" : "Incorrect");
+    }
+}
+
+// Show feedback and progress to the next question
+function showFeedback(isCorrect, message) {
+    console.log('Showing feedback:', message);
+    feedbackText.textContent = message;
+    feedbackIcon.className = isCorrect ? 'correct-icon' : 'incorrect-icon';
+    
+    showState(feedbackState);
+    
+    // Wait and then move to the next question
+    setTimeout(() => {
+        currentQuestion++;
+        startNextQuestion();
+    }, 1500);
+}
+
+// Show the results screen
+function showResults() {
+    console.log('Showing results');
+    // Hide game states
+    listeningState.classList.remove('active');
+    answeringState.classList.remove('active');
+    feedbackState.classList.remove('active');
+    
+    // Update score display
+    finalScore.textContent = correctAnswers;
+    const percentage = Math.round((correctAnswers / questions.length) * 100);
+    percentageScore.textContent = `${percentage}%`;
+    correctCount.textContent = correctAnswers;
+    incorrectCount.textContent = incorrectAnswers;
+    
+    // Show results container
+    resultsContainer.classList.remove('hidden');
+    
+    // Trigger confetti if score is good and reduced motion is not preferred
+    if (correctAnswers >= 3 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        triggerConfetti();
+    }
+}
+
+// Trigger celebration confetti
+function triggerConfetti() {
+    console.log('Triggering confetti');
+    if (typeof confetti === 'function') {
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+        });
+    } else {
+        console.warn('Confetti function not available');
+    }
+}
+
+// Update the progress bar
+function updateProgressBar() {
+    const progress = (currentQuestion / questions.length) * 100;
+    progressBar.style.width = `${progress}%`;
+    
+    if (currentQuestion === 0) {
+        progressText.textContent = 'Question 1 of 5';
+    } else if (currentQuestion < questions.length) {
+        progressText.textContent = `Question ${currentQuestion + 1} of 5`;
+    } else {
+        progressText.textContent = 'Complete!';
+    }
+}
+
+// Show a specific state and hide others
+function showState(stateToShow) {
+    listeningState.classList.remove('active');
+    answeringState.classList.remove('active');
+    feedbackState.classList.remove('active');
+    
+    stateToShow.classList.add('active');
+}
+
+// Adding the browser check
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Checking browser compatibility...');
+    
+    // Check if Speech Synthesis is supported
+    if (!('speechSynthesis' in window)) {
+        alert('Your browser does not support the Speech Synthesis API, which is required for this quiz. Please try Chrome or Edge.');
+        console.error('Speech Synthesis not supported');
+    } else {
+        console.log('Speech Synthesis is supported');
+    }
+});
+
+// Debug helper - allows starting the quiz from the console if the button doesn't work
+window.forceStartQuiz = function() {
+    console.log('Force starting quiz from console');
+    startQuiz();
+};
+
+// Add a click handler directly to the document body as a fallback
+document.body.addEventListener('click', function(event) {
+    if (event.target && event.target.id === 'start-button' && startScreen.classList.contains('active')) {
+        console.log('Start button clicked via body event delegation');
+        startQuiz();
+    }
+});
