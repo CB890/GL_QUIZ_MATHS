@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Year 4 Mental Maths Quiz</title>
+    <meta name="description" content="An accessible GL Assessment style mental maths quiz for Year 4 pupils">
+    <!-- Link to Google Fonts for Nunito -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Link to our stylesheet -->
+    <link rel="stylesheet" href="style.css">
+    <!-- External dependency: canvas-confetti for the celebration effect -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+    <!-- 
+    * DEPLOYMENT INSTRUCTIONS:
+    * 
+    * To add or modify questions: 
+    * 1. Open script.js
+    * 2. Find the questions array (around line 10)
+    * 3. Edit the questions following the format: { "q": "Question text?", "a": numerical_answer }
+    * 
+    * To deploy to GitHub Pages:
+    * 1. Create a new repository on GitHub
+    * 2. Upload these three files (index.html, style.css, script.js)
+    * 3. Go to repository Settings > Pages
+    * 4. Under "Source", select "main" branch and save
+    * 5. Your quiz will be available at https://[username].github.io/[repository-name]/
+    -->
+
+    <main id="quiz-container">
+        <header>
+            <h1>Year 4 Mental Maths</h1>
+            <div id="progress-container">
+                <div aria-hidden="true" id="progress-bar"></div>
+                <p id="progress-text">Get ready</p>
+            </div>
+        </header>
+
+        <section id="game-area">
+            <div id="listening-state" class="state active">
+                <p>Listening to question...</p>
+                <div aria-hidden="true" class="audio-animation">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+
+            <div id="answering-state" class="state">
+                <label for="answer-input">Your answer:</label>
+                <input type="number" id="answer-input" autocomplete="off" aria-live="polite">
+                <div class="timer-container">
+                    <div class="timer-circle">
+                        <svg viewBox="0 0 100 100">
+                            <circle class="timer-background" cx="50" cy="50" r="45"></circle>
+                            <circle class="timer-progress" cx="50" cy="50" r="45"></circle>
+                        </svg>
+                        <span id="timer-text" aria-live="polite">10</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="feedback-state" class="state">
+                <p id="feedback-text" aria-live="assertive"></p>
+                <div id="feedback-icon" aria-hidden="true"></div>
+            </div>
+        </section>
+
+        <section id="results-container" class="hidden">
+            <h2>Quiz Complete!</h2>
+            <div class="results-summary">
+                <p>You scored: <span id="final-score">0</span> out of 5</p>
+                <p>That's <span id="percentage">0%</span></p>
+            </div>
+            <div class="results-details">
+                <div class="result-stat">
+                    <span class="result-label">Correct</span>
+                    <span id="correct-count" class="result-value">0</span>
+                </div>
+                <div class="result-stat">
+                    <span class="result-label">Incorrect</span>
+                    <span id="incorrect-count" class="result-value">0</span>
+                </div>
+            </div>
+            <button id="play-again" class="primary-button">Play Again</button>
+        </section>
+
+        <section id="start-screen" class="active">
+            <h2>Welcome to Mental Maths!</h2>
+            <p>This quiz has 5 questions that will be read aloud.</p>
+            <p>Listen carefully, then type your answer and press Enter.</p>
+            <p>You'll have 10 seconds to answer each question.</p>
+            <button id="start-button" class="primary-button">Start Quiz</button>
+            <div class="audio-settings">
+                <p>Audio test: Click to hear a sample</p>
+                <button id="test-audio" class="secondary-button">Test Audio</button>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>This is an accessible GL Assessment style quiz for Year 4 pupils.</p>
+    </footer>
+
+    <!-- Link to our script -->
+    <script src="script.js"></script>
+</body>
+</html>
